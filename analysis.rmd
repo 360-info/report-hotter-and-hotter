@@ -1,0 +1,112 @@
+---
+title: ""
+author: "James GOldie, 360info"
+---
+
+```{r setup}
+library(tidyverse)
+library(lubridate)
+library(glue)
+library(ggtext)
+library(here)
+```
+
+```{r import}
+
+# pipe fn to import surveys and do light tidying
+import_survey <- . %>%
+  { read_csv(here("data", .), na = c("", "NA", "N/A")) } %>%
+  clean_names() %>%
+  slice(-n()) %>%
+  select(-starts_with("x1")) %>%
+  mutate(opt_in_date = dmy(opt_in_date))
+
+indonesia <- import_survey("Heat-Covid Nexus Survey_Indonesia.csv")
+india     <- import_survey("Heat-Covid Nexus Survey_India.csv")
+pakistan  <- import_survey("Heat-Covid Nexus Survey_Pakistan.csv")
+cameroon  <- import_survey("Heat-Covid Nexus Survey_Cameroon.csv")
+```
+
+```{r }
+
+indonesia %>%
+  select(use_fan, experience_headache) %>%
+  replace_na(list(use_fan = "No")) ->
+test_numbers  
+  
+test_numbers %>%
+  count(use_fan, experience_headache) %>%
+  group_by(use_fan) %>%
+  mutate(prop = n / sum(n)) ->
+test_numbers_vis
+
+test_numbers %>%
+  table() %>%
+  `[`(, 2:1) %>%
+  # flip cols because experiencing a headache is the outcome we want to compare
+  # the risk of
+  orrr() ->
+test_numbers_risk
+
+label_risk <- function(x) {
+  pct_risk <- scales::percent(x - 1)
+  moreless <- ifelse(x > 1, "more", "less")
+  paste(pct_risk, moreless, "likely")
+}
+label_range <- function(x) {
+  paste(
+    scales::percent(attr(x, "lower.RR")), "to",
+    scales::percent(attr(x, "upper.RR")))
+}
+rr_statsig <- function(x) {
+  !between(1, attr(x, "lower.RR"), attr(x, "upper.RR"))
+}
+
+test_numbers_vis %>%
+  filter(experience_headache == "Yes") %>%
+  {
+    ggplot(.) +
+      aes(y = prop, x = use_fan, fill = experience_headache) +
+      geom_col() +
+      geom_richtext(
+        aes(label = glue("**{scales::percent(prop)}**<br>of respondents")),
+        colour = "white", fill = NA, label.colour = NA,
+        hjust = "inward", nudge_y = -0.00125, size = 5) +
+      scale_y_continuous(labels = scales::label_percent()) +
+      coord_flip() +
+      labs(
+        title = "Fan use and headaches in Indonesia",
+        subtitles = glue(
+          "{if_else(rr_statsig(test_numbers_risk), '☑️', '❌')} ",
+          "Fan users were ",
+          "{label_risk(attr(test_numbers_risk, 'RR'))} ",
+          "to experience a headache than non-fan users. ",
+          "(RR: {label_range(test_numbers_risk)})"))
+  }
+
+```
+
+
+These surveys do have some minor differences in columns that will require cleaning if we're to analyse them all together:
+
+```{r combinecountries}
+
+select_interesting_rows <- .
+  select(country, opt_in_date, gender, occupation_coded, own_houe, cool_home,
+    electricty, hours_day, drinking_water, rooms, ends_with("material"),
+    windows, people_in_house, normally_do_coded, add_ventilation, )
+
+# some columns don't appear in all four countries:
+all_countries <- bind_rows(
+  indonesia, india %>% select(-electricity), pakistan, cameroon
+)
+
+# columns that don't appear in all four countries
+# adm*, language, sindh, liitoral, occupation_translated, normally_do_translated, yes_pandemic_change_translated
+
+# [1] "occupation_coded"                   "normally_do_coded"
+# [3] "yes_pandemic_change_coded_general"  "yes_pandemic_change_coded_specific"
+
+# also some columns import as different types unless i specify them all!
+# (all india's $electricty are NA, so it comes in double)
+```
