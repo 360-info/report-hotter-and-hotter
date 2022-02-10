@@ -37,7 +37,9 @@ test_numbers
 test_numbers %>%
   count(use_fan, experience_headache) %>%
   group_by(use_fan) %>%
-  mutate(prop = n / sum(n)) ->
+  mutate(
+    group_n = sum(n),
+    prop = n / group_n) ->
 test_numbers_vis
 
 test_numbers %>%
@@ -69,7 +71,9 @@ test_numbers_vis %>%
       aes(y = prop, x = use_fan, fill = experience_headache) +
       geom_col() +
       geom_richtext(
-        aes(label = glue("**{scales::percent(prop)}**<br>of respondents")),
+        aes(label = glue(
+          "**{scales::percent(prop)} of respondents**<br>",
+          "({n} of {group_n})")),
         colour = "white", fill = NA, label.colour = NA,
         hjust = "inward", nudge_y = -0.00125, size = 5) +
       scale_y_continuous(labels = scales::label_percent()) +
