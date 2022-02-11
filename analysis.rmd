@@ -15,25 +15,60 @@ library(here)
 
 # pipe fn to import surveys and do light tidying
 import_survey <- . %>%
-  { read_csv(here("data", .), na = c("", "NA", "N/A")) } %>%
+  {
+    read_csv(here("data", .), na = c("", "NA", "N/A", "N / A"),
+      col_types = cols(
+        "OptIn Date" = col_date(format = "%d/%m/%Y"),
+        HoursDay = col_integer(),
+        Rooms = col_integer(),
+        Windows = col_integer(),
+        "People in House" = col_number(),
+        Temperature = col_number(),
+        "Temperature (C)" = col_number(),
+        "Relative Humidity" = col_number(),
+        "Heat Index" = col_number(),
+        "Heat Index (C)" = col_number(),
+        .default = col_factor(NULL, include_na = TRUE)
+    ))
+  } %>%
   clean_names() %>%
   slice(-n()) %>%
   select(-starts_with("x1")) %>%
-  mutate(opt_in_date = dmy(opt_in_date))
+  # normalise col names for weather in some surveys
+  rename_with(~ str_replace(.x, "_c$", ""), .cols = ends_with("_c"))
 
 indonesia <- import_survey("Heat-Covid Nexus Survey_Indonesia.csv")
 india     <- import_survey("Heat-Covid Nexus Survey_India.csv")
 pakistan  <- import_survey("Heat-Covid Nexus Survey_Pakistan.csv")
 cameroon  <- import_survey("Heat-Covid Nexus Survey_Cameroon.csv")
+
+# here's a fn to see wha tthe unique values of our categorical columns are
+get_factor_values <- . %>%
+  summarise(across(
+    where(is.factor),
+    list(
+      n = ~ length(levels(.x)),
+      # could also pivot longer so that there's a row for each level...
+      pos_values = ~ paste(levels(.x), collapse = "|")),
+    .names = "{.col}-{.fn}"
+    )) %>%
+  pivot_longer(everything(), names_to = c("col_name", ".value"),
+    names_sep = "-")
+
+get_factor_values(indonesia) %>% print(n = Inf)
 ```
 
 ```{r }
 
-indonesia %>%
+test_cols <- function(x, col1, col2) {
+
+}
+
+cameroon %>%
   select(use_fan, experience_headache) %>%
   replace_na(list(use_fan = "No")) ->
-test_numbers  
-  
+test_numbers
+
 test_numbers %>%
   count(use_fan, experience_headache) %>%
   group_by(use_fan) %>%
@@ -96,7 +131,8 @@ These surveys do have some minor differences in columns that will require cleani
 ```{r combinecountries}
 
 select_interesting_rows <- .
-  select(country, opt_in_date, gender, occupation_coded, own_houe, cool_home,
+  select(
+    country, opt_in_date, gender, occupation_coded, own_house, cool_home,
     electricty, hours_day, drinking_water, rooms, ends_with("material"),
     windows, people_in_house, normally_do_coded, add_ventilation, )
 
