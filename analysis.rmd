@@ -1,11 +1,13 @@
 ---
 title: ""
-author: "James GOldie, 360info"
+author: "James Goldie, 360info"
 ---
 
 ```{r setup}
 library(tidyverse)
+library(janitor)
 library(lubridate)
+library(mosaic)
 library(glue)
 library(ggtext)
 library(here)
@@ -55,7 +57,7 @@ get_factor_values <- . %>%
   pivot_longer(everything(), names_to = c("col_name", ".value"),
     names_sep = "-")
 
-get_factor_values(indonesia) %>% print(n = Inf)
+get_factor_values(cameroon) %>% print(n = Inf)
 ```
 
 ```{r }
@@ -66,27 +68,26 @@ test_cols <- function(x, col1, col2) {
 
 cameroon %>%
   select(use_fan, experience_headache) %>%
-  replace_na(list(use_fan = "No")) ->
+  mutate(use_fan = fct_explicit_na(use_fan, na_level = "No")) ->
 test_numbers
 
 test_numbers %>%
   count(use_fan, experience_headache) %>%
+  # now count stats per group so we can feed them into ggplot2
   group_by(use_fan) %>%
   mutate(
-    group_n = sum(n),
-    prop = n / group_n) ->
+    predictor_n = sum(n),
+    predictor_prop = n / predictor_n) ->
 test_numbers_vis
 
 test_numbers %>%
   table() %>%
-  `[`(, 2:1) %>%
-  # flip cols because experiencing a headache is the outcome we want to compare
-  # the risk of
+  print() %>%
   orrr() ->
 test_numbers_risk
 
 label_risk <- function(x) {
-  pct_risk <- scales::percent(x - 1)
+  pct_risk <- scales::percent(abs(x - 1))
   moreless <- ifelse(x > 1, "more", "less")
   paste(pct_risk, moreless, "likely")
 }
@@ -103,12 +104,12 @@ test_numbers_vis %>%
   filter(experience_headache == "Yes") %>%
   {
     ggplot(.) +
-      aes(y = prop, x = use_fan, fill = experience_headache) +
+      aes(y = predictor_prop, x = use_fan, fill = experience_headache) +
       geom_col() +
       geom_richtext(
         aes(label = glue(
-          "**{scales::percent(prop)} of respondents**<br>",
-          "({n} of {group_n})")),
+          "**{scales::percent(predictor_prop)} of respondents**<br>",
+          "({n} of {predictor_n} surveyed)")),
         colour = "white", fill = NA, label.colour = NA,
         hjust = "inward", nudge_y = -0.00125, size = 5) +
       scale_y_continuous(labels = scales::label_percent()) +
@@ -117,7 +118,7 @@ test_numbers_vis %>%
         title = "Fan use and headaches in Indonesia",
         subtitles = glue(
           "{if_else(rr_statsig(test_numbers_risk), '☑️', '❌')} ",
-          "Fan users were ",
+          "People without fans were ",
           "{label_risk(attr(test_numbers_risk, 'RR'))} ",
           "to experience a headache than non-fan users. ",
           "(RR: {label_range(test_numbers_risk)})"))
