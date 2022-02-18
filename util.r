@@ -15,17 +15,21 @@ rr_statsig <- function(x) {
   !between(1, attr(x, "lower.RR"), attr(x, "upper.RR"))
 }
 
-risk_subtitle <- function(risk, disadvantage, advantage, bad_outcome) {
+risk_subtitle <- function(risk, disadvantage, advantage, bad_outcome,
+  statsig = FALSE) {
+
+  statsig_emoji <- if_else(rr_statsig(risk), '☑️', '❌')
+
   glue(
-          "{if_else(rr_statsig(risk), '☑️', '❌')} ",
-          "People with <= 12 hrs electricty a day were ",
-          "{label_risk(attr(risk, 'RR'))} ",
-          "to experience a headache than non-fan users. ",
-          "(RR: {label_range(risk)})")
+    "{if_else(statsig, statsig_emoji, '')}",
+    "People {disadvantage} were ",
+    "{label_risk(attr(risk, 'RR'))} ",
+    "to {bad_outcome} than {advantage}.")
 }
 
-rate_diff_plot <- function(df, bad_outcome, good_outcome, disadvantage,
-  advantage, phrase_disadvantage, phrase_advantage, phrase_bad_outcome) {
+rate_diff_plot <- function(df, predictor, outcome, bad_outcome, good_outcome,
+  disadvantage, advantage, phrase_disadvantage, phrase_advantage,
+  phrase_bad_outcome) {
 
   # build the contingency table:
   # "people w/ X disadvantage were Y% more/less likely to experience Z bad
@@ -51,7 +55,7 @@ rate_diff_plot <- function(df, bad_outcome, good_outcome, disadvantage,
 
   # ceate the plot
   risk_plot <- ggplot(filter(df, {{ bad_outcome }})) +
-      aes(y = predictor_prop, x = hours_day, fill = experience_headache) +
+      aes(y = predictor_prop, x = {{ predictor }}, fill = {{ outcome }}) +
       geom_col() +
       geom_richtext(
         aes(label = glue(
