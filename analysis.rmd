@@ -31,6 +31,7 @@ import_survey <- . %>%
         "Heat Index" = col_number(),
         "Heat Index (C)" = col_number(),
         .default = col_factor(NULL, include_na = TRUE)
+        # .default = col_character()
     ))
   } %>%
   clean_names() %>%
@@ -57,62 +58,107 @@ get_factor_values <- . %>%
   pivot_longer(everything(), names_to = c("col_name", ".value"),
     names_sep = "-")
 
-get_factor_values(indonesia) %>% print(n = Inf)
+get_factor_values(pakistan) %>% print(n = Inf)
 ```
 
 ```{r }
+cameroon %>% select(ends_with("material")) %>% summary()
+
 indonesia %>%
-  select(hours_day, experience_headache) %>%
   mutate(
-    hours_day = case_when(
-      hours_day <= 12 ~ "Half the day or less",
-      hours_day <= 24 ~ "More than half the day",
-      hours_day > 24 ~ NA_character_),
-    experience_headache = fct_drop(experience_headache)) ->
+    metal_roof = case_when(
+      roofing_material %in% c(
+        "SHEET METAL [TIN/ZINC/CORRUGATED IRON]", "GALVANISED IRON") ~ "Yes",
+      roofing_material %in% c(
+        "DRIED CLAY", "WOODEN SHINGLES", "REINFORCED CONCRETE") ~ "No",
+      TRUE ~ NA_character_)) %>%
+  select(metal_roof, experience_headache) %>%
+  drop_na(metal_roof) ->
 test_numbers
 
 test_numbers %>%
-  count(hours_day, experience_headache) %>%
+  count(metal_roof, experience_headache) %>%
   # now count stats per group so we can feed them into ggplot2
-  group_by(hours_day) %>%
+  group_by(metal_roof) %>%
   mutate(
     predictor_n = sum(n),
     predictor_prop = n / predictor_n) ->
 test_numbers_vis
 
 rate_diff_plot(test_numbers_vis,
+  predictor = metal_roof, outcome = experience_headache,
   bad_outcome = experience_headache == "Yes",
   good_outcome = experience_headache == "No",
-  disadvantage = hours_day == "Half the day or less",
-  advantage = hours_day == "More than half the day",
-  phrase_disadvantage = "with no more than 12 hours of electricity a day",
-  phrase_advantage = "with more than 12 hours a day of electricity",
-  phrase_bad_outcome = "experience a headache") +
-  labs(title = "Electricity and headaches in Indonesia")
-
-test_numbers_vis %>%
-  filter(experience_headache == "Yes") %>%
-  {
-    
-  }
-
+  disadvantage = metal_roof == "Yes",
+  advantage = metal_roof == "No",
+  phrase_disadvantage = "with metal roofing",
+  phrase_advantage = "with other roofing",
+  phrase_bad_outcome = "experienced headaches in the last month") +
+  labs(title = "Roofing and headaches in Indonesia")
 ```
 
+```{r coolingmethods}
+
+cameroon %>%
+  select(ends_with("material"),
+  "add_ventilation", "clean_floor_with_water", "do_nothing_specific", "draw_curtains", "drink_cold_drink", "drink_warm_drink", "drink_water", "go_outside", "sit_under_tree", "sleep_outside", "sleep_lie_on_floor", "sleep_rest", "smoke", "stay_at_home", "take_a_bath_shower", "turn_off_lights", "turn_on_power_source", "unclear", "undress_change_clothes_wet_clothes", "use_a_cooler", "use_ac", "use_fan", "use_manual_fan_cooling_device", "use_talcum_powder") %>%
+  summary()
+
+  # indonesia: go_outside, take_a_bath_shower, undress_change_clothes_wet_clothes,
+  #   use_fan
+  # pakistan: add_ventilation, do_nothing_specific, go_outside,
+  #   take_a_bath_shower, turn_on_power_source, unclear
+  # india: go_outside, sit_under_tree, use_a_cooler
+  # cameroon: do_nothing_specific, go_outside, take_a_bath_shower
+
+
+```
 
 These surveys do have some minor differences in columns that will require cleaning if we're to analyse them all together:
 
 ```{r combinecountries}
 
-select_interesting_rows <- .
-  select(
-    country, opt_in_date, gender, occupation_coded, own_house, cool_home,
-    electricty, hours_day, drinking_water, rooms, ends_with("material"),
-    windows, people_in_house, normally_do_coded, add_ventilation, )
-
 # some columns don't appear in all four countries:
-all_countries <- bind_rows(
-  indonesia, india %>% select(-electricity), pakistan, cameroon
-)
+all_countries <-
+  bind_rows(
+    india %>% select(country, roofing_material, go_outside),
+    indonesia %>% select(country, roofing_material, go_outside),
+    pakistan %>% select(country, roofing_material, go_outside),
+    cameroon %>% select(country, roofing_material, go_outside)) %>%
+  mutate(
+    go_outside = fct_explicit_na(go_outside, "No"),
+    metal_roof = case_when(
+      roofing_material %in% c(
+        "SHEET METAL [TIN/ZINC/CORRUGATED IRON]", "GALVANISED IRON") ~ "Yes",
+      roofing_material %in% c(
+        "DRIED CLAY", "WOODEN SHINGLES", "REINFORCED CONCRETE", "PALM FRONDS",
+          "CERAMIC TILE", "BAMBOO", "T-GIRDER") ~ "No",
+      TRUE ~ NA_character_)) %>%
+    drop_na(metal_roof) %>%
+    select(country, go_outside, metal_roof)
+
+all_countries %>%
+  count(metal_roof, go_outside) %>%
+  # now count stats per group so we can feed them into ggplot2
+  group_by(metal_roof) %>%
+  mutate(
+    predictor_n = sum(n),
+    predictor_prop = n / predictor_n) ->
+test_numbers_vis
+
+rate_diff_plot(test_numbers_vis,
+  predictor = metal_roof, outcome = go_outside,
+  bad_outcome = go_outside == "Yes",
+  good_outcome = go_outside == "No",
+  disadvantage = metal_roof == "Yes",
+  advantage = metal_roof == "No",
+  phrase_disadvantage = "with metal roofing",
+  phrase_advantage = "with other roofing",
+  phrase_bad_outcome = "go outside to escape the heat") +
+  labs(title = "Roofing and going outside in 4 countries")
+
+
+
 
 # columns that don't appear in all four countries
 # adm*, language, sindh, liitoral, occupation_translated, normally_do_translated, yes_pandemic_change_translated
