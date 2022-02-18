@@ -57,7 +57,7 @@ get_factor_values <- . %>%
   pivot_longer(everything(), names_to = c("col_name", ".value"),
     names_sep = "-")
 
-get_factor_values(cameroon) %>% print(n = Inf)
+get_factor_values(indonesia) %>% print(n = Inf)
 ```
 
 ```{r }
@@ -71,21 +71,52 @@ cameroon %>%
   mutate(use_fan = fct_explicit_na(use_fan, na_level = "No")) ->
 test_numbers
 
+indonesia %>%
+  select(hours_day, experience_headache) %>%
+  mutate(
+    hours_day = case_when(
+      hours_day <= 12 ~ "Half the day or less",
+      hours_day <= 24 ~ "More than half the day",
+      hours_day > 24 ~ NA_character_),
+    experience_headache = fct_drop(experience_headache)) ->
+test_numbers
+
 test_numbers %>%
-  count(use_fan, experience_headache) %>%
+  count(hours_day, experience_headache) %>%
   # now count stats per group so we can feed them into ggplot2
-  group_by(use_fan) %>%
+  group_by(hours_day) %>%
   mutate(
     predictor_n = sum(n),
     predictor_prop = n / predictor_n) ->
 test_numbers_vis
 
-test_numbers %>%
-  table() %>%
-  print() %>%
+# manually build contingency table to ensure we're consistent in answering
+# "people w/ X disadvantage were Y% more/less likely to experience Z bad outcome"
+build_2x2 <- function(df, bad_outcome, good_outcome, disadvantage, advantage) {
+
+  contingency_table <- data.frame(
+    bad_outcome = c(
+      df %>% filter({{ bad_outcome }}, {{ advantage }}) %>% pull(n),
+      df %>% filter({{ bad_outcome }}, {{ disadvantage }}) %>% pull(n)),
+    good_outcome = c(
+      df %>% filter({{ good_outcome }}, {{ advantage }}) %>% pull(n),
+      df %>% filter({{ good_outcome }}, {{ disadvantage }}) %>% pull(n)))
+
+  rownames(contingency_table) <- c("advantage", "disadvantage")
+  return(contingency_table)
+}
+
+# calc the relative risk of bad_outcome given disadvantage compared to advantage
+test_numbers_vis %>%
+  build_2x2(
+    bad_outcome = experience_headache == "Yes",
+    good_outcome = experience_headache == "No",
+    disadvantage = hours_day == "Half the day or less",
+    advantage = hours_day == "More than half the day") %>%
   orrr() ->
 test_numbers_risk
 
+# labelling functions
 label_risk <- function(x) {
   pct_risk <- scales::percent(abs(x - 1))
   moreless <- ifelse(x > 1, "more", "less")
@@ -104,7 +135,7 @@ test_numbers_vis %>%
   filter(experience_headache == "Yes") %>%
   {
     ggplot(.) +
-      aes(y = predictor_prop, x = use_fan, fill = experience_headache) +
+      aes(y = predictor_prop, x = hours_day, fill = experience_headache) +
       geom_col() +
       geom_richtext(
         aes(label = glue(
@@ -115,10 +146,10 @@ test_numbers_vis %>%
       scale_y_continuous(labels = scales::label_percent()) +
       coord_flip() +
       labs(
-        title = "Fan use and headaches in Indonesia",
+        title = "Electricty and headaches in Indonesia",
         subtitles = glue(
           "{if_else(rr_statsig(test_numbers_risk), '☑️', '❌')} ",
-          "People without fans were ",
+          "People with <= 12 hrs electricty a day were ",
           "{label_risk(attr(test_numbers_risk, 'RR'))} ",
           "to experience a headache than non-fan users. ",
           "(RR: {label_range(test_numbers_risk)})"))
