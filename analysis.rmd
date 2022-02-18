@@ -7,10 +7,10 @@ author: "James Goldie, 360info"
 library(tidyverse)
 library(janitor)
 library(lubridate)
-library(mosaic)
 library(glue)
 library(ggtext)
 library(here)
+source(here("util.r"))
 ```
 
 ```{r import}
@@ -61,16 +61,6 @@ get_factor_values(indonesia) %>% print(n = Inf)
 ```
 
 ```{r }
-
-test_cols <- function(x, col1, col2) {
-
-}
-
-cameroon %>%
-  select(use_fan, experience_headache) %>%
-  mutate(use_fan = fct_explicit_na(use_fan, na_level = "No")) ->
-test_numbers
-
 indonesia %>%
   select(hours_day, experience_headache) %>%
   mutate(
@@ -90,69 +80,20 @@ test_numbers %>%
     predictor_prop = n / predictor_n) ->
 test_numbers_vis
 
-# manually build contingency table to ensure we're consistent in answering
-# "people w/ X disadvantage were Y% more/less likely to experience Z bad outcome"
-build_2x2 <- function(df, bad_outcome, good_outcome, disadvantage, advantage) {
-
-  contingency_table <- data.frame(
-    bad_outcome = c(
-      df %>% filter({{ bad_outcome }}, {{ advantage }}) %>% pull(n),
-      df %>% filter({{ bad_outcome }}, {{ disadvantage }}) %>% pull(n)),
-    good_outcome = c(
-      df %>% filter({{ good_outcome }}, {{ advantage }}) %>% pull(n),
-      df %>% filter({{ good_outcome }}, {{ disadvantage }}) %>% pull(n)))
-
-  rownames(contingency_table) <- c("advantage", "disadvantage")
-  return(contingency_table)
-}
-
-# calc the relative risk of bad_outcome given disadvantage compared to advantage
-test_numbers_vis %>%
-  build_2x2(
-    bad_outcome = experience_headache == "Yes",
-    good_outcome = experience_headache == "No",
-    disadvantage = hours_day == "Half the day or less",
-    advantage = hours_day == "More than half the day") %>%
-  orrr() ->
-test_numbers_risk
-
-# labelling functions
-label_risk <- function(x) {
-  pct_risk <- scales::percent(abs(x - 1))
-  moreless <- ifelse(x > 1, "more", "less")
-  paste(pct_risk, moreless, "likely")
-}
-label_range <- function(x) {
-  paste(
-    scales::percent(attr(x, "lower.RR")), "to",
-    scales::percent(attr(x, "upper.RR")))
-}
-rr_statsig <- function(x) {
-  !between(1, attr(x, "lower.RR"), attr(x, "upper.RR"))
-}
+rate_diff_plot(test_numbers_vis,
+  bad_outcome = experience_headache == "Yes",
+  good_outcome = experience_headache == "No",
+  disadvantage = hours_day == "Half the day or less",
+  advantage = hours_day == "More than half the day",
+  phrase_disadvantage = "with no more than 12 hours of electricity a day",
+  phrase_advantage = "with more than 12 hours a day of electricity",
+  phrase_bad_outcome = "experience a headache") +
+  labs(title = "Electricity and headaches in Indonesia")
 
 test_numbers_vis %>%
   filter(experience_headache == "Yes") %>%
   {
-    ggplot(.) +
-      aes(y = predictor_prop, x = hours_day, fill = experience_headache) +
-      geom_col() +
-      geom_richtext(
-        aes(label = glue(
-          "**{scales::percent(predictor_prop)} of respondents**<br>",
-          "({n} of {predictor_n} surveyed)")),
-        colour = "white", fill = NA, label.colour = NA,
-        hjust = "inward", nudge_y = -0.00125, size = 5) +
-      scale_y_continuous(labels = scales::label_percent()) +
-      coord_flip() +
-      labs(
-        title = "Electricty and headaches in Indonesia",
-        subtitles = glue(
-          "{if_else(rr_statsig(test_numbers_risk), '☑️', '❌')} ",
-          "People with <= 12 hrs electricty a day were ",
-          "{label_risk(attr(test_numbers_risk, 'RR'))} ",
-          "to experience a headache than non-fan users. ",
-          "(RR: {label_range(test_numbers_risk)})"))
+    
   }
 
 ```
