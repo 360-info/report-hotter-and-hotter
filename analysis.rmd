@@ -18,7 +18,7 @@ source(here("util.r"))
 # pipe fn to import surveys and do light tidying
 import_survey <- . %>%
   {
-    read_csv(here("data", .), na = c("", "NA", "N/A", "N / A"),
+    read_csv(., na = c("", "NA", "N/A", "N / A"),
       col_types = cols(
         "OptIn Date" = col_date(format = "%d/%m/%Y"),
         HoursDay = col_integer(),
@@ -40,10 +40,34 @@ import_survey <- . %>%
   # normalise col names for weather in some surveys
   rename_with(~ str_replace(.x, "_c$", ""), .cols = ends_with("_c"))
 
-indonesia <- import_survey("Heat-Covid Nexus Survey_Indonesia.csv")
-india     <- import_survey("Heat-Covid Nexus Survey_India.csv")
-pakistan  <- import_survey("Heat-Covid Nexus Survey_Pakistan.csv")
-cameroon  <- import_survey("Heat-Covid Nexus Survey_Cameroon.csv")
+survey_remote_root <-
+  "https://github.com/Cool-infrastructures/Covid19-Heat/raw/main/data/raw_data/"
+
+# download the surveys (cc-by 4.0) from:
+# https://github.com/Cool-infrastructures/Covid19-Heat
+# extra info, like survey coding framework, available from:
+# https://doi.org/10.7488/ds/2961
+
+cameroon <- bind_rows(
+  import_survey(paste0(survey_remote_root,
+    "Cool%20Infrastructures%20Cameroon%20Raw%20Data%20Wave%201.csv")),
+  import_survey(paste0(survey_remote_root,
+    "Cool%20Infrastructures%20Cameroon%20Raw%20Data%20Wave%202.csv")))
+indonesia <- bind_rows(
+  import_survey(paste0(survey_remote_root,
+    "Cool%20Infrastructures%20Indonesia%20Raw%20Data%20Wave%201.csv")),
+  import_survey(paste0(survey_remote_root,
+    "Cool%20Infrastructures%20Indonesia%20Raw%20Data%20Wave%202.csv")))
+india <- bind_rows(
+  import_survey(paste0(survey_remote_root,
+    "Cool%20Infrastructures%20India%20Raw%20Data%20Wave%201.csv")),
+  import_survey(paste0(survey_remote_root,
+    "Cool%20Infrastructures%20India%20Raw%20Data%20Wave%202.csv")))
+pakistan <- bind_rows(
+  import_survey(paste0(survey_remote_root,
+    "Cool%20Infrastructures%20Pakistan%20Raw%20Data%20Wave%201.csv")),
+  import_survey(paste0(survey_remote_root,
+    "Cool%20Infrastructures%20Pakistan%20Raw%20Data%20Wave%202.csv")))
 
 # here's a fn to see wha tthe unique values of our categorical columns are
 get_factor_values <- . %>%
@@ -61,7 +85,7 @@ get_factor_values <- . %>%
 get_factor_values(pakistan) %>% print(n = Inf)
 ```
 
-```{r }
+```{r comparerisk}
 cameroon %>% select(ends_with("material")) %>% summary()
 
 indonesia %>%
