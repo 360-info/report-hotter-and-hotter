@@ -13,61 +13,13 @@ library(here)
 source(here("util.r"))
 ```
 
+Download the surveys (CC-BY 4.0) from [the GitHub repo](https://github.com/Cool-infrastructures/Covid19-Heat). Extra info, like the survey coding framework, is available from [the published paper](https://doi.org/10.7488/ds/2961).
+
 ```{r import}
-
-# pipe fn to import surveys and do light tidying
-import_survey <- . %>%
-  {
-    read_csv(., na = c("", "NA", "N/A", "N / A"),
-      col_types = cols(
-        "OptIn Date" = col_date(format = "%d/%m/%Y"),
-        HoursDay = col_integer(),
-        Rooms = col_integer(),
-        Windows = col_integer(),
-        "People in House" = col_number(),
-        Temperature = col_number(),
-        "Temperature (C)" = col_number(),
-        "Relative Humidity" = col_number(),
-        "Heat Index" = col_number(),
-        "Heat Index (C)" = col_number(),
-        .default = col_factor(NULL, include_na = TRUE)
-        # .default = col_character()
-    ))
-  } %>%
-  clean_names() %>%
-  slice(-n()) %>%
-  select(-starts_with("x1")) %>%
-  # normalise col names for weather in some surveys
-  rename_with(~ str_replace(.x, "_c$", ""), .cols = ends_with("_c"))
-
 survey_remote_root <-
-  "https://github.com/Cool-infrastructures/Covid19-Heat/raw/main/data/raw_data/"
-
-# download the surveys (cc-by 4.0) from:
-# https://github.com/Cool-infrastructures/Covid19-Heat
-# extra info, like survey coding framework, available from:
-# https://doi.org/10.7488/ds/2961
-
-cameroon <- bind_rows(
-  import_survey(paste0(survey_remote_root,
-    "Cool%20Infrastructures%20Cameroon%20Raw%20Data%20Wave%201.csv")),
-  import_survey(paste0(survey_remote_root,
-    "Cool%20Infrastructures%20Cameroon%20Raw%20Data%20Wave%202.csv")))
-indonesia <- bind_rows(
-  import_survey(paste0(survey_remote_root,
-    "Cool%20Infrastructures%20Indonesia%20Raw%20Data%20Wave%201.csv")),
-  import_survey(paste0(survey_remote_root,
-    "Cool%20Infrastructures%20Indonesia%20Raw%20Data%20Wave%202.csv")))
-india <- bind_rows(
-  import_survey(paste0(survey_remote_root,
-    "Cool%20Infrastructures%20India%20Raw%20Data%20Wave%201.csv")),
-  import_survey(paste0(survey_remote_root,
-    "Cool%20Infrastructures%20India%20Raw%20Data%20Wave%202.csv")))
-pakistan <- bind_rows(
-  import_survey(paste0(survey_remote_root,
-    "Cool%20Infrastructures%20Pakistan%20Raw%20Data%20Wave%201.csv")),
-  import_survey(paste0(survey_remote_root,
-    "Cool%20Infrastructures%20Pakistan%20Raw%20Data%20Wave%202.csv")))
+  "https://github.com/Cool-infrastructures/Covid19-Heat/raw/main/data"
+all_survey <- import_survey(paste0(
+  survey_remote_root, "Covid-19_Heat_combined_survey.csv"))
 
 # here's a fn to see wha tthe unique values of our categorical columns are
 get_factor_values <- . %>%
@@ -82,7 +34,7 @@ get_factor_values <- . %>%
   pivot_longer(everything(), names_to = c("col_name", ".value"),
     names_sep = "-")
 
-get_factor_values(pakistan) %>% print(n = Inf)
+get_factor_values(all_survey) %>% print(n = Inf)
 ```
 
 ```{r comparerisk}
@@ -143,14 +95,10 @@ These surveys do have some minor differences in columns that will require cleani
 ```{r combinecountries}
 
 # some columns don't appear in all four countries:
-all_countries <-
-  bind_rows(
-    india %>% select(country, roofing_material, go_outside),
-    indonesia %>% select(country, roofing_material, go_outside),
-    pakistan %>% select(country, roofing_material, go_outside),
-    cameroon %>% select(country, roofing_material, go_outside)) %>%
+all_survey %>%
+  select(country, roofing_material, go_outside) %>%
   mutate(
-    go_outside = fct_explicit_na(go_outside, "No"),
+    go_outside = fct_recode(go_outside, "Yes" = "Yes", "No" = "missing"),
     metal_roof = case_when(
       roofing_material %in% c(
         "SHEET METAL [TIN/ZINC/CORRUGATED IRON]", "GALVANISED IRON") ~ "Yes",
@@ -159,9 +107,10 @@ all_countries <-
           "CERAMIC TILE", "BAMBOO", "T-GIRDER") ~ "No",
       TRUE ~ NA_character_)) %>%
     drop_na(metal_roof) %>%
-    select(country, go_outside, metal_roof)
+    select(country, go_outside, metal_roof) ->
+roofing_gooutside
 
-all_countries %>%
+roofing_gooutside %>%
   count(metal_roof, go_outside) %>%
   # now count stats per group so we can feed them into ggplot2
   group_by(metal_roof) %>%
