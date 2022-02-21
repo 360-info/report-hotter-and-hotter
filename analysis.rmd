@@ -152,16 +152,75 @@ roof_gooutside_plot
 
 save_360plot(roof_gooutside_plot, here("out", "roofing-gooutside.png"),
   shape = "phone-landscape", device = png)
+```
 
+Now let's look at differences in bathing behaviour across countries:
 
+```{r bathing}
 
+all_survey %>%
+  select(city, take_a_bath_shower) %>%
+  mutate(
+    city = fct_relabel(city, str_to_sentence),
+    take_a_bath_shower = fct_recode(take_a_bath_shower,
+      "Yes" = "Yes",
+      "No" = "missing")) %>%
+  group_by(city) %>%
+  count(take_a_bath_shower, .drop = FALSE) %>%
+  group_by(city) %>%
+  mutate(
+    predictor_prop = n / sum(n),
+    total_n = n / predictor_prop) %>%
+  filter(take_a_bath_shower == "Yes") %>%
+  mutate(city = fct_reorder(city, predictor_prop, .desc = TRUE)) %>%
+  {
+    ggplot(.) +
+    aes(x = city, y = predictor_prop) +
+    geom_col(fill = "black") +
+    # filter labels so that small values are on outside of bar
+    geom_richtext(
+      aes(label = glue(
+        "**{scales::percent(predictor_prop, accuracy = 0.1)}**<br>",
+        "({n} of {total_n} respondents)")),
+      data = filter(., predictor_prop > 0.1),
+      hjust = "right", nudge_y = -0.005,
+      colour = "white", fill = NA, label.colour = NA,
+      family = "Body 360info", size = 5
+    ) +
+    geom_richtext(
+      aes(label = glue(
+        "**{scales::percent(predictor_prop, accuracy = 0.1)}**<br>",
+        "({n} of {total_n} respondents)")),
+      data = filter(., predictor_prop <= 0.1),
+      hjust = "left", nudge_y = 0.005,
+      colour = "black", fill = NA, label.colour = NA,
+      family = "Body 360info", size = 5
+    ) +
+    scale_y_continuous(labels = scales::label_percent(accuracy = 1)) +
+    coord_flip() +
+    theme_360() +
+    theme(
+      axis.text.y = element_text(size = rel(1.2)),
+      axis.text.x = element_text(size = rel(1.2)),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      plot.subtitle = element_markdown(
+        family = "Body 360info",
+        face = "bold",
+        size = rel(0.9),
+        lineheight = rel(1.25),
+        margin = margin(b = 20 * 1.15)),
+    ) +
+    labs(
+      x = NULL, y = NULL,
+      title = toupper("Escaping the heat"),
+      subtitle =
+        toupper("Use of baths and showers to cool down on hot days"),
+      caption = paste(
+        "**CHART:** James Goldie, 360info",
+        "**SOURCE:** Sulfikar et al. 2020",
+        sep = "<br>"))
+  } %>%
+  save_360plot(here("out", "bathing.png"), shape = "sdtv-landscape")
 
-# columns that don't appear in all four countries
-# adm*, language, sindh, liitoral, occupation_translated, normally_do_translated, yes_pandemic_change_translated
-
-# [1] "occupation_coded"                   "normally_do_coded"
-# [3] "yes_pandemic_change_coded_general"  "yes_pandemic_change_coded_specific"
-
-# also some columns import as different types unless i specify them all!
-# (all india's $electricty are NA, so it comes in double)
 ```

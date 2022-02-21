@@ -96,7 +96,7 @@ rate_diff_plot <- function(df, predictor, outcome, bad_outcome, good_outcome,
           "({n} of {predictor_n} surveyed)")),
         colour = "white", fill = NA, label.colour = NA,
         hjust = "inward", nudge_y = -0.01, size = 5.5) +
-      scale_y_continuous(labels = scales::label_percent()) +
+      scale_y_continuous(labels = scales::label_percent(accuracy = 1)) +
       scale_fill_manual(
         values = c(pal_360[["blue"]], pal_360[["darkblue"]])) +
       coord_flip() +
