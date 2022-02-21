@@ -17,7 +17,7 @@ Download the surveys (CC-BY 4.0) from [the GitHub repo](https://github.com/Cool-
 
 ```{r import}
 survey_remote_root <-
-  "https://github.com/Cool-infrastructures/Covid19-Heat/raw/main/data"
+  "https://github.com/Cool-infrastructures/Covid19-Heat/raw/main/data/"
 all_survey <- import_survey(paste0(
   survey_remote_root, "Covid-19_Heat_combined_survey.csv"))
 
