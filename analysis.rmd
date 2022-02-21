@@ -8,6 +8,7 @@ library(tidyverse)
 library(janitor)
 library(lubridate)
 library(glue)
+library(themes360info)
 library(ggtext)
 library(here)
 source(here("util.r"))
@@ -90,7 +91,7 @@ cameroon %>%
 
 ```
 
-These surveys do have some minor differences in columns that will require cleaning if we're to analyse them all together:
+Let's look at how hot, metal roofing affects people. For example, whether people are more likely to go outside to escape indoor heat:
 
 ```{r combinecountries}
 
@@ -101,10 +102,10 @@ all_survey %>%
     go_outside = fct_recode(go_outside, "Yes" = "Yes", "No" = "missing"),
     metal_roof = case_when(
       roofing_material %in% c(
-        "SHEET METAL [TIN/ZINC/CORRUGATED IRON]", "GALVANISED IRON") ~ "Yes",
+        "SHEET METAL [TIN/ZINC/CORRUGATED IRON]", "GALVANISED IRON") ~ "Metal roof",
       roofing_material %in% c(
         "DRIED CLAY", "WOODEN SHINGLES", "REINFORCED CONCRETE", "PALM FRONDS",
-          "CERAMIC TILE", "BAMBOO", "T-GIRDER") ~ "No",
+          "CERAMIC TILE", "BAMBOO", "T-GIRDER") ~ "Non-metal<br>roof",
       TRUE ~ NA_character_)) %>%
     drop_na(metal_roof) %>%
     select(country, go_outside, metal_roof) ->
@@ -123,12 +124,34 @@ rate_diff_plot(test_numbers_vis,
   predictor = metal_roof, outcome = go_outside,
   bad_outcome = go_outside == "Yes",
   good_outcome = go_outside == "No",
-  disadvantage = metal_roof == "Yes",
-  advantage = metal_roof == "No",
+  disadvantage = metal_roof == "Metal roof",
+  advantage = metal_roof == "Non-metal<br>roof",
   phrase_disadvantage = "with metal roofing",
   phrase_advantage = "with other roofing",
   phrase_bad_outcome = "go outside to escape the heat") +
-  labs(title = "Roofing and going outside in 4 countries")
+  labs(
+    title = toupper("Escaping indoor heat"),
+    caption = paste(
+      "**CHART:** James Goldie, 360info",
+      "**SOURCE:** Sulfikar et al. 2020",
+      sep = "<br>")) +
+  guides(fill = "none") +
+  theme_360() +
+  theme(
+    plot.subtitle = element_markdown(
+      family = "Body 360info",
+      face = "plain",
+      size = rel(0.9),
+      lineheight = rel(1.25),
+      margin = margin(b = 20 * 1.15)),
+    axis.title = element_blank(),
+    axis.text.y.left = element_markdown(face = "bold", size = rel(1.25)),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank()) ->
+roof_gooutside_plot
+
+save_360plot(roof_gooutside_plot, here("out", "roofing-gooutside.png"),
+  shape = "phone-landscape", device = png)
 
 
 
