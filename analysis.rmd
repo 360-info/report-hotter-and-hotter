@@ -74,23 +74,6 @@ rate_diff_plot(test_numbers_vis,
   labs(title = "Roofing and headaches in Indonesia")
 ```
 
-```{r coolingmethods}
-
-cameroon %>%
-  select(ends_with("material"),
-  "add_ventilation", "clean_floor_with_water", "do_nothing_specific", "draw_curtains", "drink_cold_drink", "drink_warm_drink", "drink_water", "go_outside", "sit_under_tree", "sleep_outside", "sleep_lie_on_floor", "sleep_rest", "smoke", "stay_at_home", "take_a_bath_shower", "turn_off_lights", "turn_on_power_source", "unclear", "undress_change_clothes_wet_clothes", "use_a_cooler", "use_ac", "use_fan", "use_manual_fan_cooling_device", "use_talcum_powder") %>%
-  summary()
-
-  # indonesia: go_outside, take_a_bath_shower, undress_change_clothes_wet_clothes,
-  #   use_fan
-  # pakistan: add_ventilation, do_nothing_specific, go_outside,
-  #   take_a_bath_shower, turn_on_power_source, unclear
-  # india: go_outside, sit_under_tree, use_a_cooler
-  # cameroon: do_nothing_specific, go_outside, take_a_bath_shower
-
-
-```
-
 Let's look at how hot, metal roofing affects people. For example, whether people are more likely to go outside to escape indoor heat:
 
 ```{r combinecountries}
@@ -133,7 +116,7 @@ rate_diff_plot(test_numbers_vis,
     title = toupper("Escaping indoor heat"),
     caption = paste(
       "**CHART:** James Goldie, 360info",
-      "**SOURCE:** Sulfikar et al. 2020",
+      "**SOURCE:** Amir et al. 2020 [doi.org/10.7488/ds/2961]",
       sep = "<br>")) +
   guides(fill = "none") +
   theme_360() +
@@ -159,23 +142,29 @@ Now let's look at differences in bathing behaviour across countries:
 ```{r bathing}
 
 all_survey %>%
-  select(city, take_a_bath_shower) %>%
+  select(city, country, take_a_bath_shower) %>%
   mutate(
-    city = fct_relabel(city, str_to_sentence),
+    geo_group = glue("**{str_to_sentence(city)}**<br>{country}"),
     take_a_bath_shower = fct_recode(take_a_bath_shower,
       "Yes" = "Yes",
       "No" = "missing")) %>%
-  group_by(city) %>%
+  drop_na(geo_group) %>%
+  select(-city, -country) %>%
+  # now count for each area
+  group_by(geo_group) %>%
   count(take_a_bath_shower, .drop = FALSE) %>%
-  group_by(city) %>%
+  group_by(geo_group) %>%
+  # work out yes/no proportions for each area
   mutate(
     predictor_prop = n / sum(n),
-    total_n = n / predictor_prop) %>%
+    total_n = sum(n)) %>%
+  ungroup() %>%
   filter(take_a_bath_shower == "Yes") %>%
-  mutate(city = fct_reorder(city, predictor_prop, .desc = TRUE)) %>%
+  # sort for ggplot2 bar order
+  mutate(geo_group = fct_reorder(geo_group, predictor_prop)) %>%
   {
     ggplot(.) +
-    aes(x = city, y = predictor_prop) +
+    aes(x = geo_group, y = predictor_prop) +
     geom_col(fill = "black") +
     # filter labels so that small values are on outside of bar
     geom_richtext(
@@ -200,25 +189,28 @@ all_survey %>%
     coord_flip() +
     theme_360() +
     theme(
-      axis.text.y = element_text(size = rel(1.2)),
+      axis.text.y = element_markdown(size = rel(1.2)),
       axis.text.x = element_text(size = rel(1.2)),
       panel.grid.major.y = element_blank(),
       panel.grid.minor.y = element_blank(),
       plot.subtitle = element_markdown(
         family = "Body 360info",
-        face = "bold",
+        face = "plain",
         size = rel(0.9),
         lineheight = rel(1.25),
         margin = margin(b = 20 * 1.15)),
     ) +
     labs(
       x = NULL, y = NULL,
-      title = toupper("Escaping the heat"),
+      title = toupper("Cooling down with water"),
       subtitle =
-        toupper("Use of baths and showers to cool down on hot days"),
+        glue(
+          "Survey respondents in Karachi, Pakistan **were more likely to cool down with a bath or shower**<br>",
+          "then respondents in other surveyed places. The difference suggests that **local customs<br>",
+          "and water scarcity** play a part in how people respond to extreme heat."),
       caption = paste(
         "**CHART:** James Goldie, 360info",
-        "**SOURCE:** Sulfikar et al. 2020",
+        "**SOURCE:** Amir et al. 2020 [doi.org/10.7488/ds/2961]",
         sep = "<br>"))
   } %>%
   save_360plot(here("out", "bathing.png"), shape = "sdtv-landscape")
